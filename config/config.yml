@@ -4,12 +4,12 @@ server:
   name: "My Minecraft Server"
   type: "java" # options: java, bedrock
   version: "1.20.1"
-  memory: "3G"
+  memory: "1200M" # Safe limit for 2GB hosts
   max_players: 20
   # For Auto-download:
   # Java example: https://piston-data.mojang.com/v1/objects/84196a0c4741487ccabc3727df94ec4a3baf8198/server.jar
   # Bedrock example: https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.51.01.zip
-  download_url: "https://piston-data.mojang.com/v1/objects/64bb6d763bed0a9f1d632ec347938594144943ed/server.jar"
+  download_url: "https://piston-data.mojang.com/v1/objects/1b557e7b033b583cd9f66746b7a9ab1ec1673ced/server.jar"
 
 panel:
   web_port: 8080

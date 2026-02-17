@@ -85,8 +85,33 @@ class MinecraftServer {
         }
 
         const cmd = isJava ? 'java' : `./${fileName}`;
-        // Safe memory allocation: Start with 512M, allow growth up to the configured limit
-        const args = isJava ? ['-Xmx' + this.config.server.memory, '-Xms512M', '-jar', fileName, 'nogui'] : [];
+
+        // Aikar's Optimized Flags for 1.21+ Stability on low-RAM environments
+        const aikarFlags = [
+            '-XX:+UseG1GC',
+            '-XX:+ParallelRefProcEnabled',
+            '-XX:MaxGCPauseMillis=200',
+            '-XX:+UnlockExperimentalVMOptions',
+            '-XX:+DisableExplicitGC',
+            '-XX:+AlwaysPreTouch',
+            '-XX:G1HeapWastePercent=5',
+            '-XX:G1MixedGCCountTarget=4',
+            '-XX:G1MixedGCLiveThresholdPercent=90',
+            '-XX:G1RSetUpdatingPauseTimePercent=5',
+            '-XX:SurviorRatio=32',
+            '-XX:+PerfDisableSharedMem',
+            '-XX:MaxTenuringThreshold=1',
+            '-Dusing.aikars.flags=https://mcutils.com',
+            '-Daikars.new.flags=true'
+        ];
+
+        const args = isJava ? [
+            '-Xmx' + this.config.server.memory,
+            '-Xms512M',
+            ...aikarFlags,
+            '-jar', fileName,
+            'nogui'
+        ] : [];
 
         this.process = spawn(cmd, args, {
             cwd: this.serverPath,
