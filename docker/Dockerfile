@@ -1,19 +1,23 @@
 FROM node:20-slim
 
-# Install Java 21 (needed for latest Minecraft versions)
-RUN mkdir -p /usr/share/man/man1 && \
-    apt-get update && \
-    apt-get install -y curl screen wget iputils-ping libicu-dev gnupg wget && \
-    mkdir -p /etc/apt/keyrings && \
-    curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor > /etc/apt/keyrings/adoptium.gpg && \
-    echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/debian bookworm main" > /etc/apt/sources.list.d/adoptium.list && \
-    apt-get update && \
-    apt-get install -y temurin-21-jdk && \
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y curl screen wget iputils-ping libicu-dev && \
     apt-get clean;
+
+# Manually install Java 21 (Temurin) to ensure compatibility and avoid repo issues
+RUN curl -L https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2%2B13/OpenJDK21U-jdk_x64_linux_hotspot_21.0.2_13.tar.gz -o /tmp/java.tar.gz && \
+    mkdir -p /opt/java && \
+    tar -xzf /tmp/java.tar.gz -C /opt/java --strip-components=1 && \
+    rm /tmp/java.tar.gz
+
+# Set Java environment variables
+ENV JAVA_HOME=/opt/java
+ENV PATH="${JAVA_HOME}/bin:${PATH}"
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm install --production
+RUN npm install --omit=dev
 COPY . .
 
 RUN mkdir -p /app/minecraft/server /app/minecraft/backups && chmod -R 777 /app/minecraft
