@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>
+        <%= config.server.name %> | Dashboard
+    </title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+
+<body>
+    <aside class="sidebar">
+        <div class="logo"><span style="color: var(--primary)">◈</span> DevzServer</div>
+        <nav class="nav-links">
+            <a href="#" class="nav-item active"><span>🏠</span> <span>Dashboard</span></a>
+            <a href="#files" class="nav-item"><span>📁</span> <span>Files</span></a>
+            <a href="#backups" class="nav-item"><span>📦</span> <span>Backups</span></a>
+        </nav>
+        <div class="user-profile">
+            <div class="avatar">
+                <%= user.username[0].toUpperCase() %>
+            </div>
+            <div style="flex: 1; min-width: 0">
+                <div style="font-weight: 600; font-size: 0.85rem">
+                    <%= user.username %>
+                </div>
+            </div>
+            <a href="/logout" style="text-decoration: none; font-size: 1rem">🚪</a>
+        </div>
+    </aside>
+    <main class="main">
+        <header>
+            <div>
+                <h1>
+                    <%= config.server.name %>
+                </h1>
+                <p style="color: var(--text-muted); font-size: 0.85rem">Real-time Terminal</p>
+            </div>
+            <div id="status-badge" class="status-badge status-stopped"><span id="status-text">Stopped</span></div>
+        </header>
+        <div class="grid">
+            <div>
+                <div id="console" class="console">
+                    <div class="console-line">Connecting...</div>
+                </div>
+                <div class="command-bar">
+                    <input type="text" id="cmd-input" placeholder="Type a command..."
+                        onkeypress="if(event.key==='Enter') sendCmd()">
+                    <button class="btn-primary" onclick="sendCmd()">Send</button>
+                </div>
+            </div>
+            <div class="control-sidebar">
+                <div class="card" style="margin-bottom: 24px">
+                    <h3>Power Control</h3>
+                    <div class="control-group">
+                        <button class="btn-primary" onclick="control('start')">Start Server</button>
+                        <button class="btn-outline" onclick="control('stop')">Stop</button>
+                        <button class="btn-outline" onclick="control('restart')">Restart</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <h3>Server Info</h3>
+                    <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.85rem">
+                        <div style="display: flex; justify-content: space-between"><span
+                                style="color: var(--text-muted)">RAM</span><span>
+                                <%= config.server.memory %>
+                            </span></div>
+                        <div style="display: flex; justify-content: space-between"><span
+                                style="color: var(--text-muted)">Type</span><span style="text-transform: capitalize">
+                                <%= config.server.type %>
+                            </span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <section id="files" class="card">
+            <h3>File Explorer</h3>
+            <div id="file-list" class="file-list"></div>
+        </section>
+        <section id="backups" class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px">
+                <h3>Backups</h3><button class="btn-outline" onclick="createBackup()">New Backup</button>
+            </div>
+            <div id="backup-list" class="file-list"></div>
+        </section>
+    </main>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/dashboard.js"></script>
+</body>
+
+</html>

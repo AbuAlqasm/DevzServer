@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | DevzServer</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #818cf8;
+            --bg: #0f1117;
+            --card: #161a23;
+            --border: rgba(255, 255, 255, 0.06);
+            --text: #f1f5f9;
+            --text-muted: #94a3b8;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 40px;
+            width: 100%;
+            max-width: 380px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+        }
+
+        input {
+            width: 100%;
+            background: #000;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #fff;
+            font-size: 0.9rem;
+            outline: none;
+            transition: 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+        }
+
+        .btn-login {
+            width: 100%;
+            background: var(--primary);
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 8px;
+        }
+
+        .btn-login:hover {
+            filter: brightness(1.1);
+        }
+
+        .error-msg {
+            background: rgba(248, 113, 113, 0.05);
+            color: #f87171;
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            text-align: center;
+            margin-bottom: 20px;
+            border: 1px solid rgba(248, 113, 113, 0.2);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="login-card">
+        <div class="header">
+            <h1 style="color: var(--primary)">◈ DevzServer</h1>
+            <p>Sign in to your control panel</p>
+        </div>
+        <% if (error) { %>
+            <div class="error-msg">
+                <%= error %>
+            </div>
+            <% } %>
+                <form action="/login" method="POST">
+                    <div class="form-group"><label>Username</label><input type="text" name="username" required
+                            autofocus></div>
+                    <div class="form-group"><label>Password</label><input type="password" name="password" required>
+                    </div>
+                    <button type="submit" class="btn-login">Unlock Panel</button>
+                </form>
+    </div>
+</body>
+
+</html>
