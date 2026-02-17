@@ -1,8 +1,14 @@
 FROM node:20-slim
 
+# Install Java 21 (needed for latest Minecraft versions)
 RUN mkdir -p /usr/share/man/man1 && \
     apt-get update && \
-    apt-get install -y openjdk-17-jre-headless curl screen wget iputils-ping libicu-dev && \
+    apt-get install -y curl screen wget iputils-ping libicu-dev gnupg wget && \
+    mkdir -p /etc/apt/keyrings && \
+    curl -fsSL https://packages.adoptium.net/artifactory/api/gpg/key/public | gpg --dearmor > /etc/apt/keyrings/adoptium.gpg && \
+    echo "deb [signed-by=/etc/apt/keyrings/adoptium.gpg] https://packages.adoptium.net/artifactory/debian bookworm main" > /etc/apt/sources.list.d/adoptium.list && \
+    apt-get update && \
+    apt-get install -y temurin-21-jdk && \
     apt-get clean;
 
 WORKDIR /app

@@ -1,83 +1,209 @@
 const socket = io();
+let currentPath = '';
+let selectedItem = null;
 
-const consoleDiv = document.getElementById('console');
-const statusBadge = document.getElementById('status-badge');
-const statusText = document.getElementById('status-text');
-const cmdInput = document.getElementById('cmd-input');
+// Icons Mapper (SVG helper)
+const getIcon = (item) => {
+    if (item.isDirectory) return '<svg class="icon" style="color: var(--primary)"><use href="#icon-files"/></svg>';
+    const ext = item.name.split('.').pop().toLowerCase();
+    let icon = '<svg class="icon" style="color: var(--text-muted)"><use href="#icon-files"/></svg>';
+    return icon;
+};
 
-// Socket Events
+// Tab Switching Logic
+function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+
+    document.getElementById('tab-' + tabId).classList.add('active');
+    document.getElementById('nav-' + tabId).classList.add('active');
+
+    if (tabId === 'files') loadFiles();
+    if (tabId === 'backups') loadBackups();
+}
+
+// Socket IO Console & Status
 socket.on('console', (data) => {
+    const consoleDiv = document.getElementById('console');
     const line = document.createElement('div');
-    line.className = 'console-line';
+    line.className = 'terminal-line';
     line.textContent = data;
     consoleDiv.appendChild(line);
     consoleDiv.scrollTop = consoleDiv.scrollHeight;
 });
 
 socket.on('status', (status) => {
-    statusBadge.className = 'status-badge status-' + status;
-    statusText.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    const badge = document.getElementById('status-badge');
+    badge.className = `status-badge status-${status}`;
+    badge.querySelector('span').textContent = status.charAt(0).toUpperCase() + status.slice(1);
 });
 
-// Control Functions
-function control(action) {
-    socket.emit('control', action);
-}
-
+function control(action) { socket.emit('control', action); }
 function sendCmd() {
-    const cmd = cmdInput.value.trim();
-    if (cmd) {
-        socket.emit('command', cmd);
-        cmdInput.value = '';
+    const input = document.getElementById('cmd-input');
+    if (input.value.trim()) {
+        socket.emit('command', input.value);
+        input.value = '';
     }
 }
 
-// File Explorer
-async function loadFiles(path = '') {
+// File Management Logic
+async function loadFiles(path = currentPath) {
+    currentPath = path;
+    updateBreadcrumb();
     const list = document.getElementById('file-list');
-    list.innerHTML = '<div style="padding: 20px; color: var(--text-muted)">Loading...</div>';
+    list.innerHTML = '<div style="padding: 20px; color: var(--text-muted)">Loading files...</div>';
 
     try {
         const res = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
         const files = await res.json();
 
         list.innerHTML = files.map(f => `
-            <div class="file-row" onclick="${f.isDirectory ? `loadFiles('${f.path}')` : ''}">
-                <span style="margin-right: 12px">${f.isDirectory ? '📁' : '📄'}</span>
-                <span style="flex: 1">${f.name}</span>
-                <span style="color: var(--text-muted); font-size: 0.75rem">${f.isDirectory ? '' : formatSize(f.size)}</span>
+            <div class="file-item" onclick="handleFileClick('${f.path}', ${f.isDirectory})">
+                <div style="display: flex; align-items: center; overflow: hidden">
+                    ${getIcon(f)}
+                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${f.name}</span>
+                </div>
+                <span style="color: var(--text-muted)">${f.isDirectory ? '--' : formatSize(f.size)}</span>
+                <span style="color: var(--text-muted); font-size: 0.8rem">${new Date(f.mtime).toLocaleDateString()}</span>
+                <div class="file-actions">
+                    <button class="btn btn-outline" style="padding: 4px 8px" onclick="event.stopPropagation(); showRenameModal('${f.path}', '${f.name}')">✏️</button>
+                    <button class="btn btn-danger" style="padding: 4px 8px" onclick="event.stopPropagation(); deleteItem('${f.path}')">🗑️</button>
+                </div>
             </div>
-        `).join('') || '<div style="padding: 20px; color: var(--text-muted)">Directory is empty</div>';
+        `).join('');
     } catch (e) {
-        list.innerHTML = `<div style="padding: 20px; color: var(--danger)">Error: ${e.message}</div>`;
+        list.innerHTML = `<div style="padding: 20px; color: var(--danger)">Failed to load: ${e.message}</div>`;
     }
 }
 
+function handleFileClick(path, isDir) {
+    if (isDir) loadFiles(path);
+    else editFile(path);
+}
+
+function updateBreadcrumb() {
+    const bc = document.getElementById('breadcrumb');
+    const parts = currentPath.split('/').filter(p => p);
+    bc.innerHTML = '<span onclick="loadFiles(\'\')">root</span>';
+    let pathAcc = '';
+    parts.forEach(p => {
+        pathAcc += (pathAcc ? '/' : '') + p;
+        const currentPathAcc = pathAcc;
+        bc.innerHTML += ` <span style="margin: 0 8px; opacity: 0.5">/</span> <span onclick="loadFiles('${currentPathAcc}')">${p}</span>`;
+    });
+}
+
+// Advanced CRUD Operations
+async function editFile(path) {
+    try {
+        const res = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`);
+        const { content } = await res.json();
+        selectedItem = path;
+        document.getElementById('editor-modal').style.display = 'flex';
+        document.getElementById('editor-title').textContent = 'Editing: ' + path.split('/').pop();
+        document.getElementById('editor-content').value = content;
+    } catch (err) { alert('Error reading file: ' + err.message); }
+}
+
+async function saveFile() {
+    const content = document.getElementById('editor-content').value;
+    try {
+        await fetch('/api/files/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: selectedItem, content })
+        });
+        closeModal('editor-modal');
+    } catch (err) { alert('Save failed: ' + err.message); }
+}
+
+async function deleteItem(path) {
+    if (!confirm('Are you sure you want to delete this?')) return;
+    try {
+        await fetch('/api/files/delete', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path })
+        });
+        loadFiles();
+    } catch (err) { alert('Delete failed'); }
+}
+
+function showRenameModal(path, name) {
+    selectedItem = path;
+    document.getElementById('rename-modal').style.display = 'flex';
+    document.getElementById('rename-input').value = name;
+}
+
+async function confirmRename() {
+    const newName = document.getElementById('rename-input').value;
+    try {
+        await fetch('/api/files/rename', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ oldPath: selectedItem, newName })
+        });
+        closeModal('rename-modal');
+        loadFiles();
+    } catch (err) { alert('Rename failed'); }
+}
+
+async function uploadFile() {
+    const fileInput = document.getElementById('file-upload');
+    if (!fileInput.files[0]) return;
+
+    const formData = new FormData();
+    formData.append('file', fileInput.files[0]);
+    formData.append('path', currentPath);
+
+    try {
+        await fetch('/api/files/upload', { method: 'POST', body: formData });
+        loadFiles();
+    } catch (err) { alert('Upload failed'); }
+}
+
+function showFolderModal() {
+    const name = prompt('Folder Name:');
+    if (name) createFolder(name);
+}
+
+async function createFolder(name) {
+    await fetch('/api/files/folder', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: currentPath, name })
+    });
+    loadFiles();
+}
+
+// Backups Logic
 async function loadBackups() {
     const list = document.getElementById('backup-list');
     try {
         const res = await fetch('/api/backups');
         const backups = await res.json();
         list.innerHTML = backups.map(b => `
-            <div class="file-row">
-                <span style="margin-right: 12px">📦</span>
-                <span style="flex: 1">${b.name}</span>
-                <span style="color: var(--text-muted); font-size: 0.75rem">${formatSize(b.size)}</span>
+            <div class="file-item">
+                <div style="display: flex; align-items: center">
+                    <svg class="icon"><use href="#icon-backup"/></svg>
+                    <span>${b.name}</span>
+                </div>
+                <span>${formatSize(b.size)}</span>
+                <span>${new Date(b.date).toLocaleString()}</span>
+                <div class="file-actions"><button class="btn btn-outline" style="padding: 4px 8px">Download</button></div>
             </div>
-        `).join('') || '<div style="padding: 20px; color: var(--text-muted)">No backups yet</div>';
+        `).join('');
     } catch (e) { }
 }
 
 async function createBackup() {
-    const btn = event.target;
-    btn.disabled = true;
-    btn.textContent = 'Creating...';
     await fetch('/api/backups', { method: 'POST' });
-    btn.disabled = false;
-    btn.textContent = 'Create New';
     loadBackups();
 }
 
+// Helpers
+const closeModal = (id) => document.getElementById(id).style.display = 'none';
 function formatSize(bytes) {
     if (bytes === 0) return '0 B';
     const k = 1024;

@@ -10,6 +10,7 @@ const morgan = require('morgan');
 const helmet = require('helmet');
 const bcrypt = require('bcryptjs');
 const rateLimit = require('express-rate-limit');
+const multer = require('multer');
 
 const MinecraftServer = require('./server/MinecraftServer');
 const BackupManager = require('./backup/BackupManager');
@@ -29,6 +30,21 @@ const server = http.createServer(app);
 
 // Proxy settings for platforms like Railway
 app.set('trust proxy', 1);
+
+// Multer Storage Configuration
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        const dir = path.resolve(__dirname, '../../minecraft/server', req.body.path || '');
+        if (!dir.startsWith(path.resolve(__dirname, '../../minecraft/server'))) {
+            return cb(new Error('Invalid upload path'));
+        }
+        cb(null, dir);
+    },
+    filename: (req, file, cb) => {
+        cb(null, file.originalname);
+    }
+});
+const upload = multer({ storage });
 
 // Session configuration
 const sessionMiddleware = session({
@@ -98,7 +114,6 @@ app.post('/login', loginLimiter, async (req, res) => {
     const adminPassHash = process.env.ADMIN_PASSWORD_HASH;
 
     if (username === adminUser) {
-        // 1. Try bcrypt hash from .env
         if (adminPassHash && adminPassHash.startsWith('$')) {
             try {
                 const isValid = await bcrypt.compare(password, adminPassHash);
@@ -107,48 +122,79 @@ app.post('/login', loginLimiter, async (req, res) => {
                     return res.redirect('/');
                 }
             } catch (err) { console.error('Bcrypt Error:', err); }
-        }
-        // 2. Fallback to plaintext from config.yml if no hash is configured
-        else if (!adminPassHash && password === config.panel.owner_pass) {
-            console.log('Login successful via plaintext fallback');
+        } else if (!adminPassHash && password === config.panel.owner_pass) {
             req.session.user = { username, role: 'owner' };
             return res.redirect('/');
         }
     }
-
-    console.log(`Login failed for user: ${username} (Hash loaded: ${!!adminPassHash})`);
     res.redirect('/login?error=Invalid credentials or server configuration');
 });
-
 
 app.get('/logout', (req, res) => {
     req.session.destroy();
     res.redirect('/login');
 });
 
-// API
+// Advanced File API
 app.get('/api/files', auth, (req, res) => {
     try {
         res.json(fileManager.listFiles(req.query.path || ''));
     } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.get('/api/backups', auth, (req, res) => res.json(backupManager.listBackups()));
+app.get('/api/files/content', auth, (req, res) => {
+    try {
+        res.json({ content: fileManager.readFile(req.query.path) });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
 
+app.post('/api/files/save', auth, (req, res) => {
+    try {
+        fileManager.writeFile(req.body.path, req.body.content);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/files/rename', auth, (req, res) => {
+    try {
+        fileManager.renameItem(req.body.oldPath, req.body.newName);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/files/delete', auth, (req, res) => {
+    try {
+        fileManager.deleteItem(req.body.path);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/files/folder', auth, (req, res) => {
+    try {
+        fileManager.createFolder(req.body.path, req.body.name);
+        res.json({ success: true });
+    } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/files/upload', auth, upload.single('file'), (req, res) => {
+    res.json({ success: true });
+});
+
+// Backups API
+app.get('/api/backups', auth, (req, res) => res.json(backupManager.listBackups()));
 app.post('/api/backups', auth, async (req, res) => {
-    const name = await backupManager.createBackup();
-    res.json({ success: true, name });
+    try {
+        const name = await backupManager.createBackup();
+        res.json({ success: true, name });
+    } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // Socket.IO
 io.use((socket, next) => sessionMiddleware(socket.request, {}, next));
-
 io.on('connection', (socket) => {
     const session = socket.request.session;
     if (!session || !session.user) return socket.disconnect(true);
-
     socket.emit('status', mcServer.status);
-
     socket.on('control', (action) => {
         if (action === 'start') mcServer.start();
         if (action === 'stop') mcServer.stop();
@@ -157,11 +203,10 @@ io.on('connection', (socket) => {
             setTimeout(() => mcServer.start(), 2000);
         }
     });
-
     socket.on('command', (cmd) => mcServer.sendCommand(cmd));
 });
 
-// Error Handling
+// Global Error Handler
 app.use((err, req, res, next) => {
     console.error(err.stack);
     res.status(500).send('Internal Server Error');
