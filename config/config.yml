@@ -4,7 +4,7 @@ server:
   name: "My Minecraft Server"
   type: "java" # options: java, bedrock
   version: "1.20.1"
-  memory: "1200M" # Safe limit for 2GB hosts
+  memory: "1G" # Optimized for Railway 2GB plans
   max_players: 20
   # For Auto-download:
   # Java example: https://piston-data.mojang.com/v1/objects/84196a0c4741487ccabc3727df94ec4a3baf8198/server.jar

@@ -93,7 +93,6 @@ class MinecraftServer {
             '-XX:MaxGCPauseMillis=200',
             '-XX:+UnlockExperimentalVMOptions',
             '-XX:+DisableExplicitGC',
-            '-XX:+AlwaysPreTouch',
             '-XX:G1HeapWastePercent=5',
             '-XX:G1MixedGCCountTarget=4',
             '-XX:G1MixedGCLiveThresholdPercent=90',
