@@ -1,0 +1,23 @@
+# DevzServer Configuration
+
+server:
+  name: "My Minecraft Server"
+  type: "java" # options: java, bedrock
+  version: "1.20.1"
+  memory: "2G"
+  max_players: 20
+  # For Auto-download:
+  # Java example: https://piston-data.mojang.com/v1/objects/84196a0c4741487ccabc3727df94ec4a3baf8198/server.jar
+  # Bedrock example: https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.51.01.zip
+  download_url: "https://piston-data.mojang.com/v1/objects/64bb6d763bed0a9f1d632ec347938594144943ed/server.jar"
+
+panel:
+  web_port: 8080
+  owner_user: "admin"
+  # This password is used only if ADMIN_PASSWORD_HASH is not in .env
+  owner_pass: "password123"
+
+backup:
+  enabled: true
+  interval_hours: 12
+  max_backups: 5
