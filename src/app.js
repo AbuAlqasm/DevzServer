@@ -94,20 +94,32 @@ app.get('/login', (req, res) => {
 
 app.post('/login', loginLimiter, async (req, res) => {
     const { username, password } = req.body;
-    const adminUser = process.env.ADMIN_USERNAME || 'admin';
+    const adminUser = process.env.ADMIN_USERNAME || config.panel.owner_user;
     const adminPassHash = process.env.ADMIN_PASSWORD_HASH;
 
-    if (username === adminUser && adminPassHash && adminPassHash.startsWith('$')) {
-        try {
-            const isValid = await bcrypt.compare(password, adminPassHash);
-            if (isValid) {
-                req.session.user = { username, role: 'owner' };
-                return res.redirect('/');
-            }
-        } catch (err) { console.error('Bcrypt Error:', err); }
+    if (username === adminUser) {
+        // 1. Try bcrypt hash from .env
+        if (adminPassHash && adminPassHash.startsWith('$')) {
+            try {
+                const isValid = await bcrypt.compare(password, adminPassHash);
+                if (isValid) {
+                    req.session.user = { username, role: 'owner' };
+                    return res.redirect('/');
+                }
+            } catch (err) { console.error('Bcrypt Error:', err); }
+        }
+        // 2. Fallback to plaintext from config.yml if no hash is configured
+        else if (!adminPassHash && password === config.panel.owner_pass) {
+            console.log('Login successful via plaintext fallback');
+            req.session.user = { username, role: 'owner' };
+            return res.redirect('/');
+        }
     }
+
+    console.log(`Login failed for user: ${username} (Hash loaded: ${!!adminPassHash})`);
     res.redirect('/login?error=Invalid credentials or server configuration');
 });
+
 
 app.get('/logout', (req, res) => {
     req.session.destroy();
