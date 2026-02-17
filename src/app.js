@@ -200,7 +200,14 @@ io.on('connection', (socket) => {
         if (action === 'stop') mcServer.stop();
         if (action === 'restart') {
             mcServer.stop();
-            setTimeout(() => mcServer.start(), 2000);
+            const checkStop = setInterval(() => {
+                if (mcServer.status === 'stopped') {
+                    clearInterval(checkStop);
+                    mcServer.start();
+                }
+            }, 500);
+            // Timeout safety for restart
+            setTimeout(() => clearInterval(checkStop), 20000);
         }
     });
     socket.on('command', (cmd) => mcServer.sendCommand(cmd));

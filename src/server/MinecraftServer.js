@@ -118,9 +118,10 @@ class MinecraftServer {
         // Try graceful stop
         this.sendCommand('stop');
 
+        const processToKill = this.process;
         // Force kill if not stopped in 15s
         setTimeout(() => {
-            if (this.process) {
+            if (this.process && this.process === processToKill) {
                 this.io.emit('console', '--- Force killing server... ---');
                 this.process.kill('SIGKILL');
             }
