@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  minecraft-panel:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    ports:
+      - "${PORT:-8080}:8080"
+      - "25700:25700"
+      - "19132:19132/udp"
+    volumes:
+      - ../minecraft:/app/minecraft
+      - ../config:/app/config
+    restart: always
+    environment:
+      - NODE_ENV=production
+      - SESSION_SECRET=${SESSION_SECRET}
+      - ADMIN_USERNAME=${ADMIN_USERNAME}
+      - ADMIN_PASSWORD_HASH=${ADMIN_PASSWORD_HASH}
+
+volumes:
+  minecraft-data:

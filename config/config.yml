@@ -1,0 +1,21 @@
+server:
+  name: "DevzServer"
+  type: "java" # java | bedrock
+  version: "1.20.1"
+  download_url: "https://piston-data.mojang.com/v1/objects/8410fd0986161fd449f87c53d0436d654f5d6086/server.jar"
+  port: 25700
+  max_players: 10
+  memory: "2G"
+
+panel:
+  web_port: 8080
+  owner_user: "admin"
+  owner_pass: "password123"
+
+backup:
+  enabled: true
+  interval_hours: 24
+  max_backups: 5
+
+docker:
+  auto_restart: true

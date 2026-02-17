@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= config.server.name %> | Premium Control Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;600;800&family=Fira+Code&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+    <!-- Sidebar -->
+    <aside class="sidebar">
+        <div class="logo">
+            <span style="color: var(--primary)">⚡</span> DevzServer
+        </div>
+        
+        <nav class="nav-links">
+            <a href="#" class="nav-item active">
+                <span>🏠</span> Dashboard
+            </a>
+            <a href="#files" class="nav-item">
+                <span>📁</span> File Manager
+            </a>
+            <a href="#backups" class="nav-item">
+                <span>📦</span> Backups
+            </a>
+            <a href="#settings" class="nav-item">
+                <span>⚙️</span> Settings
+            </a>
+        </nav>
+
+        <div class="user-profile">
+            <div class="avatar"><%= user.username[0].toUpperCase() %></div>
+            <div style="flex: 1">
+                <div style="font-weight: 700; font-size: 0.9rem"><%= user.username %></div>
+                <div style="font-size: 0.75rem; color: var(--text-dim)">Role: <%= user.role %></div>
+            </div>
+            <a href="/logout" style="text-decoration: none; color: var(--secondary)">🚪</a>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main">
+        <header>
+            <div>
+                <h1 style="font-family: 'Outfit'; margin-bottom: 5px">Console</h1>
+                <p style="color: var(--text-dim); font-size: 0.9rem">Manage your <%= config.server.type %> server in real-time</p>
+            </div>
+            
+            <div class="status-card">
+                <div id="status-indicator" class="status-indicator status-stopped">
+                    <span id="status-text">Stopped</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="grid">
+            <!-- Left Column: Console -->
+            <div class="terminal-container">
+                <div class="glass-card" style="padding: 10px">
+                    <div id="console" class="console">
+                        <div class="console-line">Waiting for connection...</div>
+                    </div>
+                </div>
+
+                <div class="command-input-group">
+                    <input type="text" id="cmd-input" placeholder="Type a command (e.g. /say Hello)..." onkeypress="if(event.key==='Enter') sendCmd()">
+                    <button class="btn-start" style="border-radius: 8px; padding: 10px 20px" onclick="sendCmd()">Send</button>
+                </div>
+            </div>
+
+            <!-- Right Column: Quick Controls & Info -->
+            <div style="display: flex; flex-direction: column; gap: 30px">
+                <div class="glass-card">
+                    <h3 style="margin-bottom: 20px">Power Actions</h3>
+                    <div class="control-buttons">
+                        <button class="btn-start" onclick="control('start')">
+                            <span>▶️</span> Start Server
+                        </button>
+                        <button class="btn-stop" onclick="control('stop')">
+                            <span>🛑</span> Stop Server
+                        </button>
+                        <button class="btn-restart" onclick="control('restart')">
+                            <span>🔄</span> Restart
+                        </button>
+                    </div>
+                </div>
+
+                <div class="glass-card">
+                    <h3 style="margin-bottom: 20px">Server Stats</h3>
+                    <div style="display: flex; flex-direction: column; gap: 15px">
+                        <div style="display: flex; justify-content: space-between">
+                            <span style="color: var(--text-dim)">Memory</span>
+                            <span style="font-weight: 600"><%= config.server.memory %></span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between">
+                            <span style="color: var(--text-dim)">Players</span>
+                            <span style="font-weight: 600">0 / <%= config.server.max_players %></span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between">
+                            <span style="color: var(--text-dim)">Version</span>
+                            <span style="font-weight: 600"><%= config.server.version %></span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sections -->
+        <section id="files" class="glass-card" style="margin-top: 30px">
+            <h3 style="margin-bottom: 20px">File Manager</h3>
+            <div id="file-list" class="file-explorer">
+                <!-- Loaded via JS -->
+            </div>
+        </section>
+
+        <section id="backups" class="glass-card" style="margin-top: 30px">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px">
+                <h3>Backups</h3>
+                <button class="btn-start" style="padding: 8px 15px" onclick="createBackup()">Create New</button>
+            </div>
+            <div id="backup-list" class="file-explorer">
+                <!-- Loaded via JS -->
+            </div>
+        </section>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="/js/dashboard.js"></script>
+</body>
+</html>
