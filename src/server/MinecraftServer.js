@@ -85,7 +85,8 @@ class MinecraftServer {
         }
 
         const cmd = isJava ? 'java' : `./${fileName}`;
-        const args = isJava ? ['-Xmx' + this.config.server.memory, '-Xms' + this.config.server.memory, '-jar', fileName, 'nogui'] : [];
+        // Safe memory allocation: Start with 512M, allow growth up to the configured limit
+        const args = isJava ? ['-Xmx' + this.config.server.memory, '-Xms512M', '-jar', fileName, 'nogui'] : [];
 
         this.process = spawn(cmd, args, {
             cwd: this.serverPath,
