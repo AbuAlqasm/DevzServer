@@ -98,7 +98,7 @@ class MinecraftServer {
             '-XX:G1MixedGCCountTarget=4',
             '-XX:G1MixedGCLiveThresholdPercent=90',
             '-XX:G1RSetUpdatingPauseTimePercent=5',
-            '-XX:SurviorRatio=32',
+            '-XX:SurvivorRatio=32',
             '-XX:+PerfDisableSharedMem',
             '-XX:MaxTenuringThreshold=1',
             '-Dusing.aikars.flags=https://mcutils.com',
