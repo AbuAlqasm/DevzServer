@@ -64,6 +64,25 @@ class MinecraftServer {
                 return this.io.emit('status', 'stopped');
             }
         }
+        // Java specific setup: Accept EULA and check properties
+        if (isJava) {
+            const eulaPath = path.join(this.serverPath, 'eula.txt');
+            if (!fs.existsSync(eulaPath)) {
+                fs.writeFileSync(eulaPath, 'eula=true\n', 'utf8');
+                this.io.emit('console', 'EULA accepted automatically.');
+            } else {
+                let eulaContent = fs.readFileSync(eulaPath, 'utf8');
+                if (!eulaContent.includes('eula=true')) {
+                    fs.writeFileSync(eulaPath, 'eula=true\n', 'utf8');
+                    this.io.emit('console', 'EULA updated to accepted.');
+                }
+            }
+
+            const propsPath = path.join(this.serverPath, 'server.properties');
+            if (!fs.existsSync(propsPath)) {
+                fs.writeFileSync(propsPath, 'query.port=25565\nmotd=DevzServer Managed\n', 'utf8');
+            }
+        }
 
         const cmd = isJava ? 'java' : `./${fileName}`;
         const args = isJava ? ['-Xmx' + this.config.server.memory, '-Xms' + this.config.server.memory, '-jar', fileName, 'nogui'] : [];
