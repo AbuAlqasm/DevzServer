@@ -89,8 +89,11 @@ class MinecraftServer {
 
         this.process = spawn(cmd, args, {
             cwd: this.serverPath,
-            shell: !isJava // Need shell for Linux executables sometimes
+            shell: !isJava
         });
+
+        const pid = this.process.pid;
+        this.io.emit('console', `[SYSTEM] Process started with PID: ${pid}`);
 
         this.process.stdout.on('data', (data) => {
             const str = data.toString();
@@ -101,28 +104,34 @@ class MinecraftServer {
             }
         });
 
-        this.process.stderr.on('data', (data) => this.io.emit('console', `[ERR] ${data.toString()}`));
+        this.process.stderr.on('data', (data) => {
+            const str = data.toString();
+            this.io.emit('console', `[STDERR] ${str}`);
+        });
 
-        this.process.on('close', (code) => {
+        this.process.on('close', (code, signal) => {
             this.status = 'stopped';
             this.io.emit('status', 'stopped');
-            this.io.emit('console', `--- Server stopped (code ${code}) ---`);
+            const reason = signal ? `killed by signal ${signal}` : `exit code ${code}`;
+            this.io.emit('console', `--- Server stopped (PID ${pid}, ${reason}) ---`);
             this.process = null;
         });
     }
 
     stop() {
         if (!this.process) return;
-        this.io.emit('console', '--- Stopping server... ---');
+        const pidToKill = this.process.pid;
+        const processToKill = this.process;
+
+        this.io.emit('console', `--- Stopping server (PID ${pidToKill})... ---`);
 
         // Try graceful stop
         this.sendCommand('stop');
 
-        const processToKill = this.process;
         // Force kill if not stopped in 15s
         setTimeout(() => {
             if (this.process && this.process === processToKill) {
-                this.io.emit('console', '--- Force killing server... ---');
+                this.io.emit('console', `--- Force killing server (PID ${pidToKill})... ---`);
                 this.process.kill('SIGKILL');
             }
         }, 15000);

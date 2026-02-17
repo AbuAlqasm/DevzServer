@@ -196,6 +196,7 @@ io.on('connection', (socket) => {
     if (!session || !session.user) return socket.disconnect(true);
     socket.emit('status', mcServer.status);
     socket.on('control', (action) => {
+        console.log(`[SOCKET] Action received from ${session.user.username}: ${action}`);
         if (action === 'start') mcServer.start();
         if (action === 'stop') mcServer.stop();
         if (action === 'restart') {
