@@ -1,5 +1,17 @@
 // === DevzServer Dashboard v2.0 ===
-const socket = io();
+let socket;
+try {
+    socket = io();
+    socket.on('connect', () => console.log('[DevzServer] Socket connected'));
+    socket.on('connect_error', (err) => {
+        console.error('[DevzServer] Socket error:', err.message);
+        toast('Connection error: ' + err.message, 'error');
+    });
+    socket.on('disconnect', (reason) => console.log('[DevzServer] Socket disconnected:', reason));
+} catch (e) {
+    console.error('[DevzServer] Failed to initialize socket:', e);
+}
+
 let currentPath = '';
 let selectedItem = null;
 let currentPromptAction = null;

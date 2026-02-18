@@ -78,7 +78,7 @@ const sessionMiddleware = session({
         secure: process.env.NODE_ENV === 'production',
         httpOnly: true,
         maxAge: 24 * 60 * 60 * 1000,
-        sameSite: 'strict'
+        sameSite: 'lax'
     }
 });
 
@@ -123,16 +123,8 @@ if (config.backup.enabled) {
 
 // === Middleware ===
 app.use(helmet({
-    contentSecurityPolicy: {
-        directives: {
-            defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-            fontSrc: ["'self'", "https://fonts.gstatic.com"],
-            connectSrc: ["'self'", "ws:", "wss:"],
-            imgSrc: ["'self'", "data:"]
-        }
-    }
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false
 }));
 
 app.use(morgan('short', { stream: { write: (msg) => logger.info(msg.trim()) } }));
@@ -159,8 +151,7 @@ const auth = (req, res, next) => {
     next();
 };
 
-// CSRF Middleware (after auth for API routes)
-app.use(validateCsrf);
+// CSRF is validated per-route on dangerous operations only
 
 // === Routes ===
 app.get('/', auth, (req, res) => {
