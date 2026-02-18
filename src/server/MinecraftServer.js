@@ -31,30 +31,62 @@ class MinecraftServer extends EventEmitter {
     }
 
     /**
-     * Calculate safe memory allocation based on system RAM
+     * Detect container memory limit via cgroups (Docker/Railway/K8s)
+     * Returns memory limit in MB, or null if not in a container
+     */
+    getContainerMemoryMB() {
+        const cgroupPaths = [
+            '/sys/fs/cgroup/memory.max',                    // cgroups v2
+            '/sys/fs/cgroup/memory/memory.limit_in_bytes'   // cgroups v1
+        ];
+
+        for (const cgPath of cgroupPaths) {
+            try {
+                const content = fs.readFileSync(cgPath, 'utf8').trim();
+                if (content === 'max') continue; // No limit set
+                const bytes = parseInt(content);
+                // Sanity check: must be positive and less than 1TB
+                if (!isNaN(bytes) && bytes > 0 && bytes < 1e12) {
+                    return Math.floor(bytes / (1024 * 1024));
+                }
+            } catch (e) {
+                // File doesn't exist = not in container, try next
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Calculate safe memory allocation based on actual available RAM
+     * Detects container limits to prevent OOM kills
      */
     getMemoryArgs() {
-        const configMemory = this.config.server.memory || '1G';
-        const totalSystemMB = Math.floor(os.totalmem() / (1024 * 1024));
+        const configMemory = this.config.server.memory || '512M';
+
+        // Detect REAL available memory (container limit > system RAM)
+        const containerMB = this.getContainerMemoryMB();
+        const systemMB = Math.floor(os.totalmem() / (1024 * 1024));
+        const availableMB = containerMB || systemMB;
+        const source = containerMB ? 'container' : 'system';
 
         // Parse config memory to MB
         const memMatch = configMemory.match(/^(\d+)(M|G)$/i);
-        if (!memMatch) return { xmx: '-Xmx512M', xms: '-Xms256M' };
+        if (!memMatch) return { xmx: '-Xmx256M', xms: '-Xms128M' };
 
         const memValue = parseInt(memMatch[1]);
         const memUnit = memMatch[2].toUpperCase();
-        const configMemMB = memUnit === 'G' ? memValue * 1024 : memValue;
+        const configMB = memUnit === 'G' ? memValue * 1024 : memValue;
 
-        // Don't exceed 70% of total system RAM (leave room for OS + Node.js)
-        const maxAllowed = Math.floor(totalSystemMB * 0.7);
-        const actualMemMB = Math.min(configMemMB, maxAllowed);
-        const minMemMB = Math.min(256, Math.floor(actualMemMB * 0.25));
+        // Cap at 60% of available memory (leave 40% for JVM overhead + Node.js + OS)
+        const maxAllowed = Math.floor(availableMB * 0.6);
+        const actualMB = Math.min(configMB, maxAllowed);
+        const minMB = Math.min(128, Math.floor(actualMB * 0.25));
 
-        this.log(`[SYSTEM] Memory: Requested ${configMemory}, System has ${totalSystemMB}MB, Allocating ${actualMemMB}MB`);
+        this.log(`[SYSTEM] Memory: ${source} has ${availableMB}MB, config=${configMemory}, allocating -Xmx${actualMB}M -Xms${minMB}M`);
 
         return {
-            xmx: `-Xmx${actualMemMB}M`,
-            xms: `-Xms${minMemMB}M`
+            xmx: `-Xmx${actualMB}M`,
+            xms: `-Xms${minMB}M`
         };
     }
 
