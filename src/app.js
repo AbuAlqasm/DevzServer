@@ -329,7 +329,7 @@ app.use((err, req, res, next) => {
 });
 
 // === Start Server ===
-const PORT = process.env.PORT || config.panel.web_port || 8080;
+const PORT = config.panel.web_port || process.env.PORT || 8080;
 server.listen(PORT, '0.0.0.0', () => {
     logger.info(`🚀 DevzServer panel online at port ${PORT}`);
     logger.info(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
