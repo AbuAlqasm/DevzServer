@@ -274,8 +274,12 @@ class MinecraftServer extends EventEmitter {
             // Emit event for restart logic
             this.emit('stopped', { code, signal, wasIntentional: this.shouldStop });
 
-            // Auto-restart if crashed (not intentionally stopped)
-            if (!this.shouldStop && this.config.server.auto_restart) {
+            // Auto-restart only on actual crashes (not clean exits or intentional stops)
+            // Exit code 0 = clean shutdown (port conflict, stop command, etc.) — don't restart
+            // Signal (SIGKILL, SIGTERM) or non-zero exit = crash — restart
+            const isCrash = (signal !== null) || (code !== null && code !== 0);
+
+            if (!this.shouldStop && isCrash && this.config.server.auto_restart) {
                 const maxAttempts = this.config.server.max_restart_attempts || 5;
                 const now = Date.now();
 
