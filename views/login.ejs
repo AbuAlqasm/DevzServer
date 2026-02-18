@@ -5,131 +5,268 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login | DevzServer</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --primary: #818cf8;
-            --bg: #0f1117;
-            --card: #161a23;
-            --border: rgba(255, 255, 255, 0.06);
-            --text: #f1f5f9;
-            --text-muted: #94a3b8;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            margin: 0;
-            font-family: 'Inter', sans-serif;
-            background: var(--bg);
-            color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #07080d;
+            color: #f1f5f9;
             height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* Animated gradient background */
+        body::before {
+            content: '';
+            position: fixed;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(ellipse at 20% 50%, rgba(124, 58, 237, 0.08) 0%, transparent 50%),
+                radial-gradient(ellipse at 80% 20%, rgba(168, 85, 247, 0.06) 0%, transparent 40%),
+                radial-gradient(ellipse at 60% 80%, rgba(6, 182, 212, 0.04) 0%, transparent 40%);
+            animation: bgFloat 20s ease-in-out infinite;
+            z-index: 0;
+        }
+
+        @keyframes bgFloat {
+
+            0%,
+            100% {
+                transform: translate(0, 0) rotate(0deg);
+            }
+
+            25% {
+                transform: translate(2%, -3%) rotate(1deg);
+            }
+
+            50% {
+                transform: translate(-1%, 2%) rotate(-1deg);
+            }
+
+            75% {
+                transform: translate(3%, 1%) rotate(0.5deg);
+            }
+        }
+
+        .login-container {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 400px;
+            padding: 20px;
         }
 
         .login-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 40px;
-            width: 100%;
-            max-width: 380px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            background: rgba(17, 20, 29, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 40px 36px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4),
+                0 0 40px rgba(124, 58, 237, 0.05);
+            animation: cardAppear 0.6s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .header {
+        @keyframes cardAppear {
+            from {
+                opacity: 0;
+                transform: translateY(20px) scale(0.98);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .login-header {
             text-align: center;
             margin-bottom: 32px;
         }
 
-        h1 {
-            font-size: 1.25rem;
-            font-weight: 700;
-            margin-bottom: 4px;
+        .login-logo {
+            width: 52px;
+            height: 52px;
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 16px;
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3);
+            animation: logoGlow 3s ease-in-out infinite;
         }
 
-        p {
-            color: var(--text-muted);
+        @keyframes logoGlow {
+
+            0%,
+            100% {
+                box-shadow: 0 8px 24px rgba(124, 58, 237, 0.3);
+            }
+
+            50% {
+                box-shadow: 0 8px 32px rgba(124, 58, 237, 0.5);
+            }
+        }
+
+        .login-logo svg {
+            width: 26px;
+            height: 26px;
+            color: white;
+        }
+
+        .login-header h1 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            margin-bottom: 6px;
+            letter-spacing: -0.02em;
+        }
+
+        .login-header p {
+            color: #64748b;
             font-size: 0.85rem;
         }
 
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 18px;
         }
 
         label {
             display: block;
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 8px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: #64748b;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
         }
 
         input {
             width: 100%;
-            background: #000;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px 14px;
+            background: #0a0c12;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 10px;
+            padding: 12px 16px;
             color: #fff;
             font-size: 0.9rem;
+            font-family: 'Inter', sans-serif;
             outline: none;
-            transition: 0.2s;
+            transition: all 0.2s;
         }
 
         input:focus {
-            border-color: var(--primary);
+            border-color: #7c3aed;
+            box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+        }
+
+        input::placeholder {
+            color: #475569;
         }
 
         .btn-login {
             width: 100%;
-            background: var(--primary);
+            background: linear-gradient(135deg, #7c3aed, #a855f7);
             color: #fff;
             border: none;
-            border-radius: 8px;
-            padding: 12px;
+            border-radius: 10px;
+            padding: 13px;
             font-size: 0.9rem;
-            font-weight: 600;
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
             cursor: pointer;
-            transition: 0.2s;
+            transition: all 0.2s;
             margin-top: 8px;
+            position: relative;
+            overflow: hidden;
         }
 
         .btn-login:hover {
-            filter: brightness(1.1);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 24px rgba(124, 58, 237, 0.4);
+        }
+
+        .btn-login:active {
+            transform: translateY(0);
         }
 
         .error-msg {
-            background: rgba(248, 113, 113, 0.05);
+            background: rgba(239, 68, 68, 0.06);
             color: #f87171;
-            padding: 10px;
-            border-radius: 8px;
+            padding: 11px 14px;
+            border-radius: 10px;
             font-size: 0.8rem;
             text-align: center;
             margin-bottom: 20px;
-            border: 1px solid rgba(248, 113, 113, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 0.75rem;
+            color: #475569;
         }
     </style>
 </head>
 
 <body>
-    <div class="login-card">
-        <div class="header">
-            <h1 style="color: var(--primary)">◈ DevzServer</h1>
-            <p>Sign in to your control panel</p>
-        </div>
-        <% if (error) { %>
-            <div class="error-msg">
-                <%= error %>
+    <div class="login-container">
+        <div class="login-card">
+            <div class="login-header">
+                <div class="login-logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                        stroke-linejoin="round">
+                        <polyline points="4 17 10 11 4 5" />
+                        <line x1="12" y1="19" x2="20" y2="19" />
+                    </svg>
+                </div>
+                <h1>DevzServer</h1>
+                <p>Sign in to your control panel</p>
             </div>
-            <% } %>
-                <form action="/login" method="POST">
-                    <div class="form-group"><label>Username</label><input type="text" name="username" required
-                            autofocus></div>
-                    <div class="form-group"><label>Password</label><input type="password" name="password" required>
-                    </div>
-                    <button type="submit" class="btn-login">Unlock Panel</button>
-                </form>
+
+            <% if (error) { %>
+                <div class="error-msg">
+                    <svg style="width:16px;height:16px;flex-shrink:0" viewBox="0 0 24 24" fill="none"
+                        stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="8" x2="12" y2="12" />
+                        <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    <%= error %>
+                </div>
+                <% } %>
+
+                    <form action="/login" method="POST">
+                        <div class="form-group">
+                            <label for="username">Username</label>
+                            <input type="text" id="username" name="username" placeholder="Enter your username" required
+                                autofocus>
+                        </div>
+                        <div class="form-group">
+                            <label for="password">Password</label>
+                            <input type="password" id="password" name="password" placeholder="Enter your password"
+                                required>
+                        </div>
+                        <button type="submit" class="btn-login">Unlock Panel</button>
+                    </form>
+                    <div class="footer-text">DevzServer v2.0 — Premium Control Panel</div>
+        </div>
     </div>
 </body>
 

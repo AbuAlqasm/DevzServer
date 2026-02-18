@@ -4,18 +4,23 @@ server:
   name: "My Minecraft Server"
   type: "java" # options: java, bedrock
   version: "1.20.1"
-  memory: "2G" # Optimized for Railway 2GB plans
-  max_players: 4
+  # Memory: Set this to ~70% of your available RAM
+  # Railway 512MB plan → use "384M"
+  # Railway 1GB plan → use "768M"
+  # Railway 2GB plan → use "1G"
+  # Local/VPS with 4GB+ → use "2G"
+  memory: "1G"
+  max_players: 20
+  # Auto-restart server if it crashes unexpectedly
+  auto_restart: true
+  max_restart_attempts: 5
   # For Auto-download:
-  # Java example: https://piston-data.mojang.com/v1/objects/84196a0c4741487ccabc3727df94ec4a3baf8198/server.jar
-  # Bedrock example: https://minecraft.azureedge.net/bin-linux/bedrock-server-1.20.51.01.zip
+  # Java: https://piston-data.mojang.com/v1/objects/.../server.jar
+  # Bedrock: https://minecraft.azureedge.net/bin-linux/bedrock-server-X.XX.XX.XX.zip
   download_url: "https://piston-data.mojang.com/v1/objects/1b557e7b033b583cd9f66746b7a9ab1ec1673ced/server.jar"
 
 panel:
   web_port: 8080
-  owner_user: "admin"
-  # This password is used only if ADMIN_PASSWORD_HASH is not in .env
-  owner_pass: "password123"
 
 backup:
   enabled: true

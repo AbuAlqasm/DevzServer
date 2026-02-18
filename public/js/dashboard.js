@@ -1,141 +1,260 @@
+// === DevzServer Dashboard v2.0 ===
 const socket = io();
 let currentPath = '';
 let selectedItem = null;
 let currentPromptAction = null;
+const MAX_CONSOLE_LINES = 1000;
 
-// Icons Mapper
-const getFileIcon = (item) => {
-    if (item.isDirectory) return '<svg class="icon" style="color: var(--primary)"><use href="#icon-files"/></svg>';
-    return '<svg class="icon" style="color: var(--text-muted)"><use href="#icon-files"/></svg>';
-};
+// CSRF Token
+const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
-// UX: Tab Switching
+// === Helpers ===
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function formatSize(bytes) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+}
+
+function formatDate(d) {
+    return new Date(d).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function toast(message, type = 'info') {
+    const container = document.getElementById('toast-container');
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.textContent = message;
+    container.appendChild(t);
+    requestAnimationFrame(() => t.classList.add('show'));
+    setTimeout(() => {
+        t.classList.remove('show');
+        setTimeout(() => t.remove(), 300);
+    }, 3500);
+}
+
+async function apiFetch(url, options = {}) {
+    const defaults = {
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken }
+    };
+    const merged = { ...defaults, ...options };
+    if (options.headers) merged.headers = { ...defaults.headers, ...options.headers };
+
+    const res = await fetch(url, merged);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `Request failed (${res.status})`);
+    return data;
+}
+
+// === File Icon Mapping ===
+function getFileIcon(item) {
+    if (item.isDirectory) return '<svg class="file-icon folder"><use href="#icon-folder"/></svg>';
+
+    const ext = item.name.split('.').pop().toLowerCase();
+    const configExts = ['yml', 'yaml', 'json', 'toml', 'ini', 'properties', 'cfg'];
+    const codeExts = ['js', 'ts', 'py', 'java', 'sh', 'bat', 'cmd'];
+
+    if (configExts.includes(ext)) return '<svg class="file-icon config"><use href="#icon-files"/></svg>';
+    if (codeExts.includes(ext)) return '<svg class="file-icon code"><use href="#icon-files"/></svg>';
+    return '<svg class="file-icon default"><use href="#icon-files"/></svg>';
+}
+
+// === Tab Switching ===
 function switchTab(tabId) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-
     document.getElementById('tab-' + tabId).classList.add('active');
     document.getElementById('nav-' + tabId).classList.add('active');
-
     if (tabId === 'files') loadFiles();
     if (tabId === 'backups') loadBackups();
 }
 
-// Socket: Console & Status
+// === Console ===
+function classifyLine(text) {
+    if (text.includes('[STDERR]') || text.includes('[ERROR]') || text.includes('Error') || text.includes('Exception')) return 'line-error';
+    if (text.includes('[WARN]') || text.includes('WARN')) return 'line-warn';
+    if (text.includes('[INFO]')) return 'line-info';
+    if (text.startsWith('---') || text.startsWith('[SYSTEM]')) return 'line-system';
+    if (text.includes('Done') || text.includes('complete') || text.includes('accepted')) return 'line-success';
+    return '';
+}
+
 socket.on('console', (data) => {
     const consoleDiv = document.getElementById('console');
-    const line = document.createElement('div');
-    line.className = 'terminal-line';
-    line.textContent = data;
-    consoleDiv.appendChild(line);
+    const lines = data.split('\n');
+
+    lines.forEach(lineText => {
+        if (!lineText.trim()) return;
+        const line = document.createElement('div');
+        line.className = `terminal-line ${classifyLine(lineText)}`;
+        line.textContent = lineText;
+        consoleDiv.appendChild(line);
+    });
+
+    // Limit console lines to prevent memory issues
+    while (consoleDiv.childElementCount > MAX_CONSOLE_LINES) {
+        consoleDiv.removeChild(consoleDiv.firstChild);
+    }
+
     consoleDiv.scrollTop = consoleDiv.scrollHeight;
 });
 
 socket.on('status', (status) => {
     const badge = document.getElementById('status-badge');
     badge.className = `status-badge status-${status}`;
-    badge.querySelector('span').textContent = status.charAt(0).toUpperCase() + status.slice(1);
+    const label = status.charAt(0).toUpperCase() + status.slice(1);
+    badge.innerHTML = `<div class="status-dot"></div><span>${escapeHtml(label)}</span>`;
+
+    // Update button states
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const btnRestart = document.getElementById('btn-restart');
+
+    btnStart.disabled = status !== 'stopped';
+    btnStop.disabled = status === 'stopped';
+    btnRestart.disabled = status === 'stopped';
 });
 
-function control(action) { socket.emit('control', action); }
+function control(action) {
+    socket.emit('control', action);
+    toast(`Server ${action}...`, 'info');
+}
+
 function sendCmd() {
     const input = document.getElementById('cmd-input');
-    if (input.value.trim()) {
-        socket.emit('command', input.value);
+    const cmd = input.value.trim();
+    if (cmd) {
+        socket.emit('command', cmd);
+        // Echo the command in console
+        const consoleDiv = document.getElementById('console');
+        const line = document.createElement('div');
+        line.className = 'terminal-line line-system';
+        line.textContent = `> ${cmd}`;
+        consoleDiv.appendChild(line);
+        consoleDiv.scrollTop = consoleDiv.scrollHeight;
         input.value = '';
     }
 }
 
-// Files: Navigation
-async function loadFiles(path = currentPath) {
-    currentPath = path;
+function clearConsole() {
+    const consoleDiv = document.getElementById('console');
+    consoleDiv.innerHTML = '<div class="terminal-line line-system">Console cleared.</div>';
+}
+
+// === Files ===
+async function loadFiles(filePath) {
+    if (filePath !== undefined) currentPath = filePath;
     updateBreadcrumb();
     const list = document.getElementById('file-list');
-    list.innerHTML = '<div style="padding: 32px; text-align: center; color: var(--text-muted)">Scanning directory...</div>';
+    list.innerHTML = '<div class="empty-state"><div class="loading-spinner"></div></div>';
 
     try {
-        const res = await fetch(`/api/files?path=${encodeURIComponent(path)}`);
-        const files = await res.json();
+        const files = await apiFetch(`/api/files?path=${encodeURIComponent(currentPath)}`);
 
-        list.innerHTML = files.map(f => `
-            <div class="file-item" onclick="handleItemClick('${f.path}', ${f.isDirectory})">
-                <div style="display: flex; align-items: center; overflow: hidden">
+        if (files.length === 0) {
+            list.innerHTML = '<div class="empty-state"><svg><use href="#icon-folder"/></svg><div>Folder is empty</div></div>';
+            return;
+        }
+
+        list.innerHTML = files.map(f => {
+            const safePath = escapeHtml(f.path);
+            const safeName = escapeHtml(f.name);
+            return `
+            <div class="file-item" onclick="handleItemClick('${safePath}', ${f.isDirectory})">
+                <div class="file-item-name">
                     ${getFileIcon(f)}
-                    <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap">${f.name}</span>
+                    <span>${safeName}</span>
                 </div>
-                <span style="color: var(--text-muted); font-size: 0.85rem">${f.isDirectory ? '--' : formatSize(f.size)}</span>
-                <span style="color: var(--text-muted); font-size: 0.85rem">${new Date(f.mtime).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}</span>
-                <div class="file-actions" style="text-align: right">
-                    <button class="btn btn-outline" style="padding: 6px" onclick="event.stopPropagation(); showRenameModal('${f.path}', '${f.name}')" title="Rename"><svg style="width:14px;height:14px;"><use href="#icon-edit"/></svg></button>
-                    <button class="btn btn-danger" style="padding: 6px" onclick="event.stopPropagation(); deleteItem('${f.path}')" title="Delete"><svg style="width:14px;height:14px;"><use href="#icon-trash"/></svg></button>
+                <span class="file-item-meta">${f.isDirectory ? '--' : formatSize(f.size)}</span>
+                <span class="file-item-meta">${formatDate(f.mtime)}</span>
+                <div class="file-actions">
+                    <button class="btn-icon" onclick="event.stopPropagation(); showRenameModal('${safePath}', '${safeName}')" title="Rename">
+                        <svg><use href="#icon-edit"/></svg>
+                    </button>
+                    <button class="btn-icon" style="color:var(--danger)" onclick="event.stopPropagation(); deleteItem('${safePath}')" title="Delete">
+                        <svg><use href="#icon-trash"/></svg>
+                    </button>
                 </div>
-            </div>
-        `).join('') || '<div style="padding: 40px; text-align: center; color: var(--text-muted)">Folder is empty</div>';
+            </div>`;
+        }).join('');
     } catch (e) {
-        list.innerHTML = `<div style="padding: 32px; text-align: center; color: var(--danger)">Error: ${e.message}</div>`;
+        list.innerHTML = `<div class="empty-state" style="color:var(--danger)">Error: ${escapeHtml(e.message)}</div>`;
     }
 }
 
-function handleItemClick(path, isDir) {
-    if (isDir) loadFiles(path);
-    else openEditor(path);
+function handleItemClick(filePath, isDir) {
+    if (isDir) loadFiles(filePath);
+    else openEditor(filePath);
 }
 
 function updateBreadcrumb() {
     const bc = document.getElementById('breadcrumb');
     const parts = currentPath.split('/').filter(p => p);
-    bc.innerHTML = '<span onclick="loadFiles(\'\')">root</span>';
+
+    let html = '<span class="breadcrumb-item" onclick="loadFiles(\'\')">root</span>';
     let acc = '';
     parts.forEach(p => {
         acc += (acc ? '/' : '') + p;
         const target = acc;
-        bc.innerHTML += ` <span style="margin: 0 8px; opacity: 0.3">/</span> <span onclick="loadFiles('${target}')">${p}</span>`;
+        html += `<span class="breadcrumb-sep">/</span><span class="breadcrumb-item" onclick="loadFiles('${escapeHtml(target)}')">${escapeHtml(p)}</span>`;
     });
+    bc.innerHTML = html;
 }
 
-// Files: CRUD Actions
-async function openEditor(path) {
+// === File Editor ===
+async function openEditor(filePath) {
     try {
-        const res = await fetch(`/api/files/content?path=${encodeURIComponent(path)}`);
-        const { content } = await res.json();
-        selectedItem = path;
-        document.getElementById('editor-modal').style.display = 'flex';
-        document.getElementById('editor-title').textContent = path.split('/').pop();
-        document.getElementById('editor-content').value = content;
-    } catch (err) { alert('Failed to read: ' + err.message); }
+        const data = await apiFetch(`/api/files/content?path=${encodeURIComponent(filePath)}`);
+        selectedItem = filePath;
+        document.getElementById('editor-title').textContent = filePath.split('/').pop();
+        document.getElementById('editor-content').value = data.content;
+        showModal('editor-modal');
+    } catch (err) {
+        toast('Failed to read file: ' + err.message, 'error');
+    }
 }
 
 async function saveFile() {
     const content = document.getElementById('editor-content').value;
     try {
-        await fetch('/api/files/save', {
+        await apiFetch('/api/files/save', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ path: selectedItem, content })
         });
         closeModal('editor-modal');
-    } catch (err) { alert('Could not save file'); }
+        toast('File saved successfully', 'success');
+        loadFiles();
+    } catch (err) {
+        toast('Failed to save: ' + err.message, 'error');
+    }
 }
 
+// === Create / Rename ===
 function showCreateModal(type) {
     currentPromptAction = type === 'file' ? 'createFile' : 'createFolder';
     document.getElementById('prompt-title').textContent = type === 'file' ? 'Create New File' : 'Create New Folder';
     document.getElementById('prompt-label').textContent = 'NAME';
     document.getElementById('prompt-input').value = '';
-    document.getElementById('prompt-modal').style.display = 'flex';
+    showModal('prompt-modal');
     document.getElementById('prompt-confirm-btn').onclick = handlePromptSubmit;
-    setTimeout(() => document.getElementById('prompt-input').focus(), 100);
+    setTimeout(() => document.getElementById('prompt-input').focus(), 150);
 }
 
-function showRenameModal(path, name) {
-    selectedItem = path;
+function showRenameModal(filePath, name) {
+    selectedItem = filePath;
     currentPromptAction = 'rename';
     document.getElementById('prompt-title').textContent = 'Rename Item';
     document.getElementById('prompt-label').textContent = 'NEW NAME';
     document.getElementById('prompt-input').value = name;
-    document.getElementById('prompt-modal').style.display = 'flex';
+    showModal('prompt-modal');
     document.getElementById('prompt-confirm-btn').onclick = handlePromptSubmit;
-    setTimeout(() => document.getElementById('prompt-input').focus(), 100);
+    setTimeout(() => document.getElementById('prompt-input').focus(), 150);
 }
 
 async function handlePromptSubmit() {
@@ -144,39 +263,44 @@ async function handlePromptSubmit() {
 
     try {
         if (currentPromptAction === 'createFile') {
-            await fetch('/api/files/save', {
+            await apiFetch('/api/files/save', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: (currentPath ? currentPath + '/' : '') + name, content: '' })
             });
+            toast('File created', 'success');
         } else if (currentPromptAction === 'createFolder') {
-            await fetch('/api/files/folder', {
+            await apiFetch('/api/files/folder', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ path: currentPath, name })
             });
+            toast('Folder created', 'success');
         } else if (currentPromptAction === 'rename') {
-            await fetch('/api/files/rename', {
+            await apiFetch('/api/files/rename', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ oldPath: selectedItem, newName: name })
             });
+            toast('Item renamed', 'success');
         }
         closeModal('prompt-modal');
         loadFiles();
-    } catch (err) { alert('Task failed'); }
+    } catch (err) {
+        toast('Operation failed: ' + err.message, 'error');
+    }
 }
 
-async function deleteItem(path) {
-    if (!confirm('Permanent deletion for: ' + path.split('/').pop())) return;
+async function deleteItem(filePath) {
+    const fileName = filePath.split('/').pop();
+    if (!confirm(`Delete "${fileName}" permanently?`)) return;
     try {
-        await fetch('/api/files/delete', {
+        await apiFetch('/api/files/delete', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ path })
+            body: JSON.stringify({ path: filePath })
         });
+        toast('Item deleted', 'success');
         loadFiles();
-    } catch (err) { alert('Delete failed'); }
+    } catch (err) {
+        toast('Delete failed: ' + err.message, 'error');
+    }
 }
 
 async function uploadFile() {
@@ -184,55 +308,101 @@ async function uploadFile() {
     if (!input.files[0]) return;
 
     const formData = new FormData();
-    formData.append('file', input.files[0]);
     formData.append('path', currentPath);
+    formData.append('file', input.files[0]);
 
     try {
-        await fetch('/api/files/upload', { method: 'POST', body: formData });
+        const res = await fetch('/api/files/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Upload failed');
+        toast(`Uploaded: ${data.name || input.files[0].name}`, 'success');
         loadFiles();
-    } catch (err) { alert('Upload failed'); }
+    } catch (err) {
+        toast('Upload failed: ' + err.message, 'error');
+    }
+    input.value = '';
 }
 
-// Backups Logic
+// === Backups ===
 async function loadBackups() {
     const list = document.getElementById('backup-list');
     try {
-        const res = await fetch('/api/backups');
-        const backups = await res.json();
+        const backups = await apiFetch('/api/backups');
+
+        if (backups.length === 0) {
+            list.innerHTML = '<div class="empty-state"><svg><use href="#icon-backup"/></svg><div>No backups available</div></div>';
+            return;
+        }
+
         list.innerHTML = backups.map(b => `
-            <div class="file-item">
-                <div style="display: flex; align-items: center">
-                    <svg class="icon"><use href="#icon-backup"/></svg>
-                    <span>${b.name}</span>
+            <div class="backup-item">
+                <div class="backup-name">
+                    <svg class="file-icon" style="color:var(--primary-light)"><use href="#icon-backup"/></svg>
+                    <span>${escapeHtml(b.name)}</span>
                 </div>
-                <span>${formatSize(b.size)}</span>
-                <span>${new Date(b.date).toLocaleString()}</span>
-                <div class="file-actions"><button class="btn btn-outline" style="padding: 4px 12px">Download</button></div>
+                <span class="backup-meta">${formatSize(b.size)}</span>
+                <span class="backup-meta">${formatDate(b.date)}</span>
+                <div style="text-align:right">
+                    <a href="/api/backups/download/${encodeURIComponent(b.name)}" class="btn btn-sm btn-outline" download>
+                        <svg style="width:14px;height:14px"><use href="#icon-download"/></svg> Download
+                    </a>
+                </div>
             </div>
-        `).join('') || '<div style="padding: 40px; text-align: center; color: var(--text-muted)">No backups available.</div>';
-    } catch (e) { }
+        `).join('');
+    } catch (e) {
+        list.innerHTML = `<div class="empty-state" style="color:var(--danger)">Failed to load backups</div>`;
+    }
 }
 
 async function createBackup() {
-    const btn = event.target.closest('button');
+    const btn = document.getElementById('btn-backup');
+    const oldHTML = btn.innerHTML;
     btn.disabled = true;
-    const oldText = btn.innerHTML;
-    btn.innerHTML = 'Creating...';
-    await fetch('/api/backups', { method: 'POST' });
+    btn.innerHTML = '<div class="loading-spinner"></div> Creating...';
+
+    try {
+        await apiFetch('/api/backups', { method: 'POST' });
+        toast('Backup created successfully', 'success');
+        loadBackups();
+    } catch (err) {
+        toast('Backup failed: ' + err.message, 'error');
+    }
+
     btn.disabled = false;
-    btn.innerHTML = oldText;
-    loadBackups();
+    btn.innerHTML = oldHTML;
 }
 
-// UI Helpers
-const closeModal = (id) => document.getElementById(id).style.display = 'none';
-function formatSize(bytes) {
-    if (bytes === 0) return '0 B';
-    const k = 1024, sizes = ['B', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+// === Modal Helpers ===
+function showModal(id) {
+    const modal = document.getElementById(id);
+    modal.classList.add('visible');
+    modal.style.display = 'flex';
 }
 
-// Initial Scan
-loadFiles();
-loadBackups();
+function closeModal(id) {
+    const modal = document.getElementById(id);
+    modal.classList.remove('visible');
+    setTimeout(() => { modal.style.display = 'none'; }, 200);
+}
+
+// Close modals on overlay click
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) {
+        e.target.classList.remove('visible');
+        setTimeout(() => { e.target.style.display = 'none'; }, 200);
+    }
+});
+
+// Close modals with Escape key
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        document.querySelectorAll('.modal-overlay.visible').forEach(m => closeModal(m.id));
+    }
+    // Enter in prompt modal submits
+    if (e.key === 'Enter' && document.getElementById('prompt-modal').classList.contains('visible')) {
+        handlePromptSubmit();
+    }
+});
+
+// === Init ===
+loadFiles('');

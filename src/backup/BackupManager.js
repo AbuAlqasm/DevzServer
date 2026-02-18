@@ -13,20 +13,64 @@ class BackupManager {
         }
     }
 
+    // Files/dirs to exclude from backups (saves space/time)
+    static EXCLUDE_PATTERNS = [
+        'server.jar',
+        'bedrock_server',
+        '*.jar.bak',
+        'cache',
+        '.git'
+    ];
+
+    shouldExclude(name) {
+        return BackupManager.EXCLUDE_PATTERNS.some(pattern => {
+            if (pattern.includes('*')) {
+                const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+                return regex.test(name);
+            }
+            return name === pattern;
+        });
+    }
+
     async createBackup() {
+        if (!fs.existsSync(this.serverPath)) {
+            throw new Error('Server directory does not exist');
+        }
+
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         const filename = `backup-${timestamp}.zip`;
         const dest = path.join(this.backupPath, filename);
 
         const zip = new AdmZip();
-        zip.addLocalFolder(this.serverPath);
+
+        // Add files with exclusion filter
+        const addDir = (dirPath, zipPath = '') => {
+            const items = fs.readdirSync(dirPath, { withFileTypes: true });
+            for (const item of items) {
+                if (this.shouldExclude(item.name)) continue;
+                const fullPath = path.join(dirPath, item.name);
+                const entryPath = zipPath ? `${zipPath}/${item.name}` : item.name;
+                if (item.isDirectory()) {
+                    addDir(fullPath, entryPath);
+                } else {
+                    // Skip files larger than 100MB
+                    const stats = fs.statSync(fullPath);
+                    if (stats.size > 100 * 1024 * 1024) continue;
+                    zip.addLocalFile(fullPath, zipPath || undefined);
+                }
+            }
+        };
+
+        addDir(this.serverPath);
 
         return new Promise((resolve, reject) => {
-            zip.writeZip(dest, (err) => {
-                if (err) return reject(err);
+            try {
+                zip.writeZip(dest);
                 this.rotateBackups();
                 resolve(filename);
-            });
+            } catch (err) {
+                reject(err);
+            }
         });
     }
 
@@ -41,12 +85,24 @@ class BackupManager {
             .sort((a, b) => b.date - a.date);
     }
 
+    getBackupPath(name) {
+        // Sanitize name to prevent path traversal
+        const safeName = path.basename(name);
+        if (!safeName.endsWith('.zip')) return null;
+        const fullPath = path.join(this.backupPath, safeName);
+        if (!fullPath.startsWith(this.backupPath)) return null;
+        if (!fs.existsSync(fullPath)) return null;
+        return fullPath;
+    }
+
     rotateBackups() {
         const backups = this.listBackups();
         const max = this.config.backup.max_backups || 5;
         if (backups.length > max) {
             const toDelete = backups.slice(max);
-            toDelete.forEach(f => fs.unlinkSync(path.join(this.backupPath, f.name)));
+            toDelete.forEach(f => {
+                try { fs.unlinkSync(path.join(this.backupPath, f.name)); } catch (e) { }
+            });
         }
     }
 }
