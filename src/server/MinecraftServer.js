@@ -189,12 +189,22 @@ class MinecraftServer extends EventEmitter {
             // Ensure server.properties exists
             const propsPath = path.join(this.serverPath, 'server.properties');
             if (!fs.existsSync(propsPath)) {
+                // Determine Minecraft port
+                let mcPort = this.config.server.port || 25565;
+                const panelPort = parseInt(process.env.PORT || this.config.panel.web_port || 8080);
+
+                // Avoid overlap with panel
+                if (mcPort === panelPort) {
+                    mcPort = mcPort + 1;
+                    this.log(`[SYSTEM] Port conflict detected! Moving Minecraft to ${mcPort}`);
+                }
+
                 const props = [
-                    'server-port=25565',
+                    `server-port=${mcPort}`,
                     `max-players=${this.config.server.max_players || 20}`,
                     'motd=DevzServer Managed',
                     'online-mode=true',
-                    'query.port=25565'
+                    `query.port=${mcPort}`
                 ].join('\n');
                 fs.writeFileSync(propsPath, props + '\n', 'utf8');
             }

@@ -10,6 +10,7 @@ server:
   # Railway 2GB plan → use "1G"
   # Local/VPS with 4GB+ → use "2G"
   memory: "1G"
+  port: 25565
   max_players: 20
   # Auto-restart server if it crashes unexpectedly
   auto_restart: true
